@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d0d18">
+<title>墨魂·江湖</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg-primary: #0d0d18;
+  --bg-secondary: #15152a;
+  --bg-card: #1e1e3a;
+  --bg-card-hover: #26264a;
+  --text-primary: #e8dcc8;
+  --text-secondary: #9e8c6a;
+  --text-muted: #6b5d45;
+  --accent-gold: #d4a853;
+  --accent-red: #c0392b;
+  --accent-green: #27ae60;
+  --accent-blue: #2980b9;
+  --accent-purple: #8e44ad;
+  --border-color: #3a3352;
+  --danger: #e74c3c;
+  --success: #2ecc71;
+  --warning: #f39c12;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* 背景装饰 */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 100px;
+  background: linear-gradient(to bottom, rgba(212,168,83,0.08), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  margin: 0 auto;
+  padding-bottom: 80px;
+}
+
+/* 顶部导航 */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: linear-gradient(180deg, var(--bg-primary) 0%, rgba(13,13,24,0.95) 100%);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-color);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-gold), #f0d78c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 2px;
+}
+
+.header-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.header-info .novel-tag {
+  background: rgba(212,168,83,0.15);
+  color: var(--accent-gold);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  border: 1px solid rgba(212,168,83,0.3);
+}
+
+/* 主内容区 */
+.content {
+  padding: 12px;
+}
+
+/* 欢迎页 */
+.welcome-screen {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.welcome-screen .logo {
+  font-size: 48px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 30px rgba(212,168,83,0.5);
+}
+
+.welcome-screen h2 {
+  font-size: 28px;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, var(--accent-gold), #f0d78c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 4px;
+}
+
+.welcome-screen .subtitle {
+  color: var(--text-secondary);
+  margin-bottom: 40px;
+  font-size: 14px;
+}
+
+.novel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.novel-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.novel-card:active, .novel-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-gold);
+  transform: translateY(-2px);
+}
+
+.novel-card .icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.novel-card .name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.novel-card .desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.custom-novel-input {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.custom-novel-input:focus {
+  outline: none;
+  border-color: var(--accent-gold);
+}
+
+/* 身份选择 */
+.identity-screen h3 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: var(--accent-gold);
+  text-align: center;
+}
+
+.identity-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.identity-card.selected {
+  border-color: var(--accent-gold);
+  background: rgba(212,168,83,0.08);
+}
+
+.identity-card .id-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent-gold);
+  margin-bottom: 6px;
+}
+
+.identity-card .id-bg {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.identity-card .id-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.identity-card .id-detail span {
+  background: rgba(255,255,255,0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* 难度选择 */
+.difficulty-screen h3 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: var(--accent-gold);
+  text-align: center;
+}
+
+.diff-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.diff-btn {
+  padding: 14px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.diff-btn.selected {
+  border-color: var(--accent-gold);
+  background: rgba(212,168,83,0.1);
+}
+
+.diff-btn .diff-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* 主按钮 */
+.primary-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--accent-gold), #b8860b);
+  color: #1a1a1a;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 2px;
+}
+
+.primary-btn:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.secondary-btn:active {
+  background: var(--bg-card-hover);
+}
+
+/* 游戏主界面 */
+.game-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 模块通用样式 */
+.module {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.module-header {
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: background 0.2s;
+}
+
+.module-header:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+.module-title {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.module-title .icon {
+  font-size: 16px;
+}
+
+.module-arrow {
+  color: var(--text-muted);
+  transition: transform 0.2s;
+  font-size: 12px;
+}
+
+.module.collapsed .module-arrow {
+  transform: rotate(-90deg);
+}
+
+.module.collapsed .module-body {
+  display: none;
+}
+
+.module-body {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-color);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-primary);
+}
+
+/* 剧情模块特殊样式（不折叠，直接显示） */
+.module-plot {
+  background: linear-gradient(180deg, rgba(30,30,58,0.8), var(--bg-card));
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.module-plot .module-label {
+  font-size: 12px;
+  color: var(--accent-gold);
+  margin-bottom: 8px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+/* 天道模块 */
+.module-tiandao {
+  background: linear-gradient(135deg, rgba(142,68,173,0.1), rgba(41,64,185,0.1));
+  border: 1px solid rgba(142,68,173,0.3);
+}
+
+.module-tiandao .module-title {
+  color: #a855f7;
+}
+
+/* 世界推演模块 */
+.module-world {
+  background: var(--bg-card);
+}
+
+.module-world .module-title {
+  color: var(--accent-gold);
+}
+
+/* 可选行动模块 */
+.module-actions {
+  background: var(--bg-card);
+}
+
+.module-actions .module-title {
+  color: var(--accent-green);
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.action-btn:active {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-gold);
+  transform: scale(0.98);
+}
+
+.action-btn .action-text {
+  flex: 1;
+}
+
+.action-btn .action-meta {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.action-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.tag-safe { background: rgba(39,174,96,0.2); color: var(--success); }
+.tag-risk { background: rgba(243,156,18,0.2); color: var(--warning); }
+.tag-danger { background: rgba(231,76,60,0.2); color: var(--danger); }
+
+/* JSON 数据面板 */
+.json-panel {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px;
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* 状态网格 */
+.state-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.state-item {
+  text-align: center;
+  padding: 8px 4px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+}
+
+.state-item .label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.state-item .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* 属性条 */
+.stat-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.stat-bar .stat-name {
+  width: 50px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.stat-bar .stat-track {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stat-bar .stat-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-gold), #f0d78c);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.stat-bar .stat-value {
+  width: 50px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* 任务列表 */
+.quest-item {
+  padding: 10px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.quest-item .quest-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.quest-item .quest-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.quest-item .quest-progress {
+  height: 4px;
+  background: var(--bg-primary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.quest-item .quest-progress-fill {
+  height: 100%;
+  background: var(--accent-green);
+  border-radius: 2px;
+}
+
+/* 输入栏 */
+.input-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  padding: 10px 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-bar input {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.input-bar input:focus {
+  border-color: var(--accent-gold);
+}
+
+.send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-gold), #b8860b);
+  color: #1a1a1a;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.send-btn:active {
+  transform: scale(0.9);
+}
+
+.send-btn:disabled {
+  opacity: 0.5;
+}
+
+/* 快捷指令 */
+.quick-actions {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 12px 8px;
+  margin-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.quick-actions::-webkit-scrollbar { display: none; }
+
+.quick-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.quick-btn:active {
+  background: var(--accent-gold);
+  color: #1a1a1a;
+  border-color: var(--accent-gold);
+}
+
+/* 加载动画 */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.loading .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 10px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 底部快捷栏 */
+.bottom-nav {
+  position: fixed;
+  bottom: 50px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+}
+
+.nav-fab {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+}
+
+.nav-fab:active {
+  background: var(--accent-gold);
+  color: #1a1a1a;
+  transform: scale(0.9);
+}
+
+/* 开局动画 */
+.opening-text {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  line-height: 2;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.opening-text .tiandao {
+  color: var(--accent-purple);
+  font-weight: 600;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  z-index: 1000;
+  animation: toastIn 0.3s ease;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* 模态框 */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent-gold);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 16px;
+}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+// ========== 全局状态 ==========
+const state = {
+  screen: 'welcome', // welcome / identity / difficulty / playing
+  novelName: '',
+  novelData: null,
+  selectedIdentity: 0,
+  selectedDifficulty: 1,
+  sessionId: '',
+  playerState: null,
+  currentRound: 0,
+  modules: null,
+  isLoading: false,
+  collapsed: {
+    quests: true,
+    canon: true,
+    tools: true,
+    cost: true,
+    combat: true,
+    statePanel: false, // 状态面板默认展开？不，默认折叠，用底部按钮调起
+  }
+};
+
+const API_BASE = '/api';
+
+// ========== 工具函数 ==========
+function $(sel) { return document.querySelector(sel); }
+function el(tag, attrs = {}, children = []) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+    else if (typeof v === 'boolean') { if (v) e.setAttribute(k, ''); else e.removeAttribute(k); }
+    else e.setAttribute(k, v);
+  }
+  children.forEach(c => {
+    if (c == null) return;
+    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  });
+  return e;
+}
+
+function showToast(msg, duration = 2000) {
+  const t = el('div', { class: 'toast' }, [msg]);
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), duration);
+}
+
+// ========== 渲染函数 ==========
+function render() {
+  const app = $('#app');
+  app.innerHTML = '';
+  
+  // 顶部导航
+  if (state.screen === 'playing') {
+    app.appendChild(renderHeader());
+  }
+  
+  // 内容区
+  const content = el('div', { class: 'content' });
+  switch (state.screen) {
+    case 'welcome': content.appendChild(renderWelcome()); break;
+    case 'identity': content.appendChild(renderIdentity()); break;
+    case 'difficulty': content.appendChild(renderDifficulty()); break;
+    case 'playing': content.appendChild(renderGame()); break;
+  }
+  app.appendChild(content);
+  
+  // 底部输入栏
+  if (state.screen === 'playing') {
+    app.appendChild(renderInputBar());
+    app.appendChild(renderBottomNav());
+  }
+}
+
+function renderHeader() {
+  const header = el('div', { class: 'header' }, [
+    el('h1', {}, ['墨魂·江湖']),
+    el('div', { class: 'header-info' }, [
+      state.playerState ? el('span', { class: 'novel-tag' }, [state.novelName]) : null,
+    ])
+  ]);
+  return header;
+}
+
+function renderWelcome() {
+  const novels = [
+    { id: '射雕英雄传', icon: '🏹', name: '射雕英雄传', desc: '南宋江湖·金庸武侠' },
+    { id: '三国演义', icon: '⚔️', name: '三国演义', desc: '东汉末年·群雄逐鹿' },
+    { id: '西游记', icon: '🐒', name: '西游记', desc: '大唐贞观·神魔世界' },
+  ];
+  
+  const grid = el('div', { class: 'novel-grid' });
+  novels.forEach(n => {
+    const card = el('div', { class: 'novel-card', onclick: () => selectNovel(n.id) }, [
+      el('div', { class: 'icon' }, [n.icon]),
+      el('div', { class: 'name' }, [n.name]),
+      el('div', { class: 'desc' }, [n.desc]),
+    ]);
+    grid.appendChild(card);
+  });
+  
+  return el('div', { class: 'welcome-screen' }, [
+    el('div', { class: 'logo' }, ['🎭']),
+    el('h2', {}, ['墨魂·江湖']),
+    el('div', { class: 'subtitle' }, ['AI 文字 MUD 世界模拟器']),
+    grid,
+    el('input', { class: 'custom-novel-input', placeholder: '输入其他小说名...（联网搜索生成）', onkeydown: (e) => {
+      if (e.key === 'Enter' && e.target.value.trim()) selectNovel(e.target.value.trim());
+    }}),
+    el('div', { style: 'font-size: 11px; color: var(--text-muted); margin-top: 8px;' }, 
+       ['当前为 Demo 版本，内置 3 部小说预设。接入 LLM API 后支持任意小说。']),
+  ]);
+}
+
+function renderIdentity() {
+  const screen = el('div', { class: 'identity-screen' });
+  screen.appendChild(el('h3', {}, ['选择你的身份']));
+  
+  if (state.novelData) {
+    state.novelData.identities.forEach((id, idx) => {
+      const card = el('div', { 
+        class: 'identity-card' + (state.selectedIdentity === idx ? ' selected' : ''),
+        onclick: () => { state.selectedIdentity = idx; render(); }
+      }, [
+        el('div', { class: 'id-name' }, [id.name]),
+        el('div', { class: 'id-bg' }, [id.background]),
+        el('div', { class: 'id-detail' }, [
+          el('span', {}, ['📍 ' + id.location]),
+          el('span', {}, ['⏰ ' + (id.time || '')]),
+          el('span', { style: 'color: var(--success);' }, ['✓ ' + id.pros]),
+        ]),
+      ]);
+      screen.appendChild(card);
+    });
+  }
+  
+  screen.appendChild(el('button', { 
+    class: 'primary-btn', 
+    onclick: nextScreen 
+  }, ['下一步：选择难度']));
+  
+  screen.appendChild(el('button', { 
+    class: 'secondary-btn', 
+    onclick: () => { state.screen = 'welcome'; render(); }
+  }, ['返回']));
+  
+  return screen;
+}
+
+function renderDifficulty() {
+  const diffs = [
+    { name: '简单', desc: '检定+2，天道宽松', color: 'var(--success)' },
+    { name: '一般', desc: '标准平衡，推荐', color: 'var(--accent-gold)' },
+    { name: '困难', desc: '检定-1，原著严格', color: 'var(--warning)' },
+    { name: '地狱', desc: '死亡永久，天谴降临', color: 'var(--danger)' },
+  ];
+  
+  const screen = el('div', { class: 'difficulty-screen' });
+  screen.appendChild(el('h3', {}, ['选择难度']));
+  
+  const btns = el('div', { class: 'diff-buttons' });
+  diffs.forEach((d, idx) => {
+    const btn = el('div', { 
+      class: 'diff-btn' + (state.selectedDifficulty === idx ? ' selected' : ''),
+      onclick: () => { state.selectedDifficulty = idx; render(); }
+    }, [
+      el('div', { style: 'font-weight: 600; color: ' + d.color + ';' }, [d.name]),
+      el('div', { class: 'diff-desc' }, [d.desc]),
+    ]);
+    btns.appendChild(btn);
+  });
+  screen.appendChild(btns);
+  
+  screen.appendChild(el('button', { 
+    class: 'primary-btn', 
+    onclick: startGame,
+    disabled: state.isLoading
+  }, [state.isLoading ? '进入江湖...' : '进入江湖']));
+  
+  screen.appendChild(el('button', { 
+    class: 'secondary-btn', 
+    onclick: () => { state.screen = 'identity'; render(); }
+  }, ['返回']));
+  
+  return screen;
+}
+
+function renderGame() {
+  const main = el('div', { class: 'game-main' });
+  
+  // 如果刚开局还没行动，显示开局文字
+  if (state.currentRound === 0 && state.openingText) {
+    main.appendChild(renderOpening());
+  }
+  
+  if (state.modules) {
+    // 模块1：剧情推演（直接显示，不折叠）
+    main.appendChild(renderPlotModule());
+    
+    // 模块3：天道（直接显示）
+    main.appendChild(renderTiandaoModule());
+    
+    // 模块6：世界推演
+    main.appendChild(renderWorldModule());
+    
+    // 模块10：可选行动
+    main.appendChild(renderActionsModule());
+  }
+  
+  if (state.isLoading) {
+    main.appendChild(el('div', { class: 'loading' }, [
+      el('div', { class: 'spinner' }, []),
+      ' 世界推演中...'
+    ]));
+  }
+  
+  return main;
+}
+
+function renderOpening() {
+  const text = state.openingText
+    .replace(/【天道开场】/, '<span class="tiandao">【天道开场】</span>');
+  const div = el('div', { class: 'opening-text' });
+  div.innerHTML = text;
+  return div;
+}
+
+function renderPlotModule() {
+  const m = state.modules.module1_plot;
+  const div = el('div', { class: 'module-plot' }, [
+    el('div', { class: 'module-label' }, ['📜 剧情推演']),
+    el('div', { style: 'white-space: pre-wrap;' }, [m.content])
+  ]);
+  return div;
+}
+
+function renderTiandaoModule() {
+  const m = state.modules.module3_tiandao;
+  const div = el('div', { class: 'module module-tiandao' }, [
+    el('div', { class: 'module-header' }, [
+      el('div', { class: 'module-title' }, [
+        el('span', { class: 'icon' }, ['⚡']),
+        '天道',
+        el('span', { style: 'font-size: 10px; margin-left: 8px; color: var(--text-muted);' }, 
+           [m.level || '无'])
+      ]),
+      el('span', { class: 'module-arrow' }, ['▼']),
+    ]),
+    el('div', { class: 'module-body' }, [
+      el('div', { style: 'white-space: pre-wrap; font-size: 13px;' }, [m.content])
+    ])
+  ]);
+  div.querySelector('.module-header').onclick = () => {
+    div.classList.toggle('collapsed');
+  };
+  return div;
+}
+
+function renderWorldModule() {
+  const m = state.modules.module6_world;
+  const div = el('div', { class: 'module module-world' }, [
+    el('div', { class: 'module-header' }, [
+      el('div', { class: 'module-title' }, [
+        el('span', { class: 'icon' }, ['🌍']),
+        '世界推演'
+      ]),
+      el('span', { class: 'module-arrow' }, ['▼']),
+    ]),
+    el('div', { class: 'module-body' }, [
+      el('div', { style: 'white-space: pre-wrap; font-size: 13px; line-height: 1.9;' }, [m.content])
+    ])
+  ]);
+  div.querySelector('.module-header').onclick = () => {
+    div.classList.toggle('collapsed');
+  };
+  return div;
+}
+
+function renderActionsModule() {
+  const m = state.modules.module10_actions;
+  const body = el('div', { class: 'module-body' });
+  const btns = el('div', { class: 'action-buttons' });
+  
+  m.actions.forEach((a, idx) => {
+    const riskClass = a.risk === '安全' ? 'tag-safe' : (a.risk === '有风险' ? 'tag-risk' : 'tag-danger');
+    const btn = el('button', { 
+      class: 'action-btn',
+      onclick: () => sendAction(a.action)
+    }, [
+      el('div', { class: 'action-text' }, [a.action]),
+      el('div', { class: 'action-meta' }, [
+        el('span', { class: 'action-tag ' + riskClass }, [a.risk]),
+      ])
+    ]);
+    btns.appendChild(btn);
+  });
+  
+  body.appendChild(btns);
+  
+  const div = el('div', { class: 'module module-actions' }, [
+    el('div', { class: 'module-header' }, [
+      el('div', { class: 'module-title' }, [
+        el('span', { class: 'icon' }, ['🎯']),
+        '可选行动'
+      ]),
+      el('span', { class: 'module-arrow' }, ['▼']),
+    ]),
+    body
+  ]);
+  div.querySelector('.module-header').onclick = () => {
+    div.classList.toggle('collapsed');
+  };
+  return div;
+}
+
+function renderInputBar() {
+  const input = el('input', { 
+    type: 'text', 
+    placeholder: '描述你的行动...',
+    onkeydown: (e) => {
+      if (e.key === 'Enter' && e.target.value.trim() && !state.isLoading) {
+        sendAction(e.target.value.trim());
+        e.target.value = '';
+      }
+    }
+  });
+  
+  const bar = el('div', { class: 'input-bar' }, [
+    input,
+    el('button', { 
+      class: 'send-btn',
+      onclick: () => {
+        const v = input.value.trim();
+        if (v && !state.isLoading) {
+          sendAction(v);
+          input.value = '';
+        }
+      },
+      disabled: state.isLoading
+    }, ['➤'])
+  ]);
+  return bar;
+}
+
+function renderBottomNav() {
+  const nav = el('div', { class: 'bottom-nav' }, [
+    el('button', { class: 'nav-fab', title: '状态', onclick: showStateModal }, ['📊']),
+    el('button', { class: 'nav-fab', title: '任务', onclick: showQuestModal }, ['📋']),
+    el('button', { class: 'nav-fab', title: '更多', onclick: showMoreModal }, ['⋯']),
+  ]);
+  return nav;
+}
+
+// ========== 模态框 ==========
+function showModal(title, content) {
+  const overlay = el('div', { class: 'modal-overlay', onclick: (e) => {
+    if (e.target === overlay) overlay.remove();
+  }}, [
+    el('div', { class: 'modal' }, [
+      el('div', { class: 'modal-header' }, [
+        el('div', { class: 'modal-title' }, [title]),
+        el('button', { class: 'modal-close', onclick: () => overlay.remove() }, ['×']),
+      ]),
+      el('div', { class: 'modal-body' }, [content]),
+    ])
+  ]);
+  document.body.appendChild(overlay);
+}
+
+function showStateModal() {
+  if (!state.playerState) return;
+  const s = state.playerState;
+  
+  const body = el('div', {}, [
+    el('div', { style: 'margin-bottom: 14px;' }, [
+      el('div', { style: 'font-size: 15px; font-weight: 600; color: var(--accent-gold); margin-bottom: 4px;' }, 
+         [s.姓名 + ' · ' + s.身份.substring(0, 20) + '...']),
+      el('div', { style: 'font-size: 12px; color: var(--text-muted);' }, 
+         ['📍 ' + s.位置 + ' | ⏰ ' + (s.世界时间?.年 || '') + ' 第' + (s.世界时间?.日 || 1) + '日 ' + (s.世界时间?.时辰 || '')]),
+    ]),
+    el('div', { style: 'margin-bottom: 12px;' }, [
+      el('div', { style: 'font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;' }, ['战斗属性']),
+      renderStatBar('气血', s.战斗?.气血 || 0, s.战斗?.气血上限 || 100),
+      renderStatBar('内力', s.战斗?.内力 || 0, s.战斗?.内力上限 || 100),
+    ]),
+    el('div', { style: 'margin-bottom: 12px;' }, [
+      el('div', { style: 'font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;' }, ['生存状态']),
+      renderStatBar('饱食', s.生存?.饱食度 || 0, 100),
+      renderStatBar('体力', s.生存?.体力 || 0, s.生存?.体力上限 || 100),
+      el('div', { class: 'state-grid', style: 'margin-top: 8px;' }, [
+        el('div', { class: 'state-item' }, [
+          el('div', { class: 'label' }, ['健康']),
+          el('div', { class: 'value' }, [s.生存?.健康 || '良好']),
+        ]),
+        el('div', { class: 'state-item' }, [
+          el('div', { class: 'label' }, ['金钱']),
+          el('div', { class: 'value' }, [s.生存?.金钱 || 0]),
+        ]),
+        el('div', { class: 'state-item' }, [
+          el('div', { class: 'label' }, ['食物']),
+          el('div', { class: 'value' }, [s.生存?.食物储备 || 0]),
+        ]),
+      ]),
+    ]),
+    el('div', { style: 'margin-bottom: 12px;' }, [
+      el('div', { style: 'font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;' }, ['六维属性']),
+      el('div', { class: 'state-grid' }, 
+        Object.entries(s.属性 || {}).map(([k, v]) =>
+          el('div', { class: 'state-item' }, [
+            el('div', { class: 'label' }, [k]),
+            el('div', { class: 'value' }, [v]),
+          ])
+        )
+      ),
+    ]),
+    el('div', {}, [
+      el('div', { style: 'font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;' }, ['天道']),
+      el('div', { class: 'state-grid' }, [
+        el('div', { class: 'state-item' }, [
+          el('div', { class: 'label' }, ['偏离度']),
+          el('div', { class: 'value', style: 'color: var(--danger);' }, [s.天道?.偏离度 || 0]),
+        ]),
+        el('div', { class: 'state-item' }, [
+          el('div', { class: 'label' }, ['气运']),
+          el('div', { class: 'value', style: 'color: var(--success);' }, [s.天道?.气运 || 0]),
+        ]),
+        el('div', { class: 'state-item' }, [
+          el('div', { class: 'label' }, ['天罚']),
+          el('div', { class: 'value', style: 'font-size: 11px;' }, [s.天道?.天罚等级 || '无']),
+        ]),
+      ]),
+    ]),
+  ]);
+  
+  showModal('📊 状态面板', body);
+}
+
+function showQuestModal() {
+  if (!state.playerState || !state.modules) return;
+  const quests = state.modules.module2_quests?.data || state.playerState.任务 || {};
+  
+  const body = el('div', {});
+  
+  // 必做任务
+  const mainQuests = quests.必做任务 || [];
+  if (mainQuests.length) {
+    body.appendChild(el('div', { style: 'font-size: 13px; font-weight: 600; color: var(--danger); margin-bottom: 8px;' }, 
+      ['📌 必做任务']));
+    mainQuests.forEach(q => {
+      body.appendChild(el('div', { class: 'quest-item' }, [
+        el('div', { class: 'quest-name' }, [q.任务名称 || q.name || '']),
+        el('div', { class: 'quest-desc' }, [q.任务描述 || '']),
+        el('div', { class: 'quest-progress' }, [
+          el('div', { class: 'quest-progress-fill', style: 'width: ' + (q.进度 || 0) + '%;' }),
+        ]),
+      ]));
+    });
+  }
+  
+  // 支线任务
+  const sideQuests = quests.支线任务 || [];
+  if (sideQuests.length) {
+    body.appendChild(el('div', { style: 'font-size: 13px; font-weight: 600; color: var(--accent-gold); margin: 16px 0 8px;' }, 
+      ['📜 支线任务']));
+    sideQuests.forEach(q => {
+      body.appendChild(el('div', { class: 'quest-item' }, [
+        el('div', { class: 'quest-name' }, [q.任务名称 || q.name || '']),
+        el('div', { class: 'quest-desc' }, [q.任务描述 || '']),
+      ]));
+    });
+  }
+  
+  if (!mainQuests.length && !sideQuests.length) {
+    body.appendChild(el('div', { style: 'text-align: center; color: var(--text-muted); padding: 20px;' }, 
+      ['暂无任务']));
+  }
+  
+  showModal('📋 任务面板', body);
+}
+
+function showMoreModal() {
+  const body = el('div', { style: 'display: flex; flex-direction: column; gap: 8px;' }, [
+    el('button', { class: 'secondary-btn', onclick: () => {
+      showToast('存档已复制到剪贴板');
+      navigator.clipboard?.writeText(JSON.stringify({
+        sessionId: state.sessionId,
+        playerState: state.playerState,
+        round: state.currentRound,
+        novel: state.novelName,
+      }));
+    }}, ['💾 存档']),
+    el('button', { class: 'secondary-btn', onclick: () => {
+      const data = prompt('请粘贴存档数据：');
+      if (data) showToast('读档功能开发中');
+    }}, ['📂 读档']),
+    el('button', { class: 'secondary-btn', onclick: () => {
+      if (confirm('确定要结束当前游戏，换一本小说吗？')) {
+        state.screen = 'welcome';
+        state.sessionId = '';
+        state.modules = null;
+        state.currentRound = 0;
+        render();
+      }
+    }}, ['🔄 换书 / 重开']),
+    el('button', { class: 'secondary-btn', onclick: () => {
+      showToast('详细/精简模式切换：在设置中调整');
+    }}, ['⚙️ 设置']),
+    el('div', { style: 'text-align: center; color: var(--text-muted); font-size: 11px; margin-top: 8px;' }, 
+      ['墨魂·江湖 Demo v1.0 · 第 ' + state.currentRound + ' 轮']),
+  ]);
+  showModal('更多功能', body);
+}
+
+function renderStatBar(name, value, max) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return el('div', { class: 'stat-bar' }, [
+    el('span', { class: 'stat-name' }, [name]),
+    el('div', { class: 'stat-track' }, [
+      el('div', { class: 'stat-fill', style: 'width: ' + pct + '%;' }),
+    ]),
+    el('span', { class: 'stat-value' }, [value + '/' + max]),
+  ]);
+}
+
+// ========== 逻辑函数 ==========
+async function selectNovel(name) {
+  state.novelName = name;
+  state.isLoading = true;
+  render();
+  
+  try {
+    const res = await fetch(API_BASE + '/novel/' + encodeURIComponent(name));
+    if (res.ok) {
+      state.novelData = await res.json();
+      state.screen = 'identity';
+    } else {
+      // 小说不在预设中，提示
+      showToast('暂不支持该小说（Demo 版本）');
+    }
+  } catch (e) {
+    showToast('网络错误：' + e.message);
+  } finally {
+    state.isLoading = false;
+    render();
+  }
+}
+
+function nextScreen() {
+  if (state.screen === 'welcome') state.screen = 'identity';
+  else if (state.screen === 'identity') state.screen = 'difficulty';
+  render();
+}
+
+async function startGame() {
+  state.isLoading = true;
+  render();
+  
+  try {
+    const res = await fetch(API_BASE + '/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        novel_name: state.novelName,
+        identity_index: state.selectedIdentity,
+        difficulty: state.selectedDifficulty,
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      state.sessionId = data.session_id;
+      state.playerState = data.state;
+      state.openingText = data.opening;
+      state.currentRound = 0;
+      state.modules = null;
+      state.screen = 'playing';
+    } else {
+      showToast('启动失败：' + (data.error || '未知错误'));
+    }
+  } catch (e) {
+    showToast('网络错误：' + e.message);
+  } finally {
+    state.isLoading = false;
+    render();
+  }
+}
+
+async function sendAction(action) {
+  if (state.isLoading) return;
+  state.isLoading = true;
+  render();
+  
+  // 滚动到顶
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  
+  try {
+    const res = await fetch(API_BASE + '/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: state.sessionId,
+        action: action,
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      state.modules = data.modules;
+      state.playerState = data.state;
+      state.currentRound = data.round;
+    } else {
+      showToast('错误：' + (data.error || '未知错误'));
+    }
+  } catch (e) {
+    showToast('网络错误：' + e.message);
+  } finally {
+    state.isLoading = false;
+    render();
+  }
+}
+
+// ========== 初始化 ==========
+render();
+</script>
+</body>
+</html>
