@@ -117,10 +117,19 @@ mohun-jianghu/
 ├── index.html                    # 纯前端成品（核心，70KB 单文件）
 ├── serve.py                      # 本地静态文件服务（可选）
 ├── 设定要求.txt                   # 游戏设定原文
-├── dify/                         # Dify 版（可选，深度定制用）
-│   ├── prompts/system_prompt.md  # 系统提示词
-│   ├── code-nodes/               # Code 节点（17个工具函数等）
-│   └── chatflow-dsl/             # Chatflow 蓝图
+├── dify/                         # Dify 版（可选，真严谨真并行）
+│   ├── prompts/                  # 4 份分层 Prompt
+│   │   ├── world_engine.md       # A·世界推演引擎（T1-T5,T11）
+│   │   ├── heavenly_will.md      # C·天道守护者（T6-T10）
+│   │   ├── canon_keeper.md       # B·原著守门人（T12-T17）
+│   │   └── system_prompt.md      # 叙事合并节点（接收三路结果生成10模块）
+│   ├── code-nodes/               # Code 节点
+│   │   ├── tools.py              # 17 个工具函数（T1-T17）
+│   │   ├── merge_results.py      # 三路工具调用合并执行器（新增）
+│   │   ├── state_parser.py       # 模块9 解析+状态更新
+│   │   ├── intent_classifier.py  # 意图分类
+│   │   └── knowledge_base_manager.py
+│   └── chatflow-dsl/             # Chatflow 蓝图（3 LLM 并行架构）
 ├── docker/docker-compose.yml     # Dify 版部署配置
 ├── scripts/                      # 部署脚本 + 小说预处理
 └── docs/README.md                # 本文档
@@ -150,9 +159,45 @@ mohun-jianghu/
 
 ---
 
-## Dify 版（可选，深度定制）
+## Dify 版（可选，深度定制 — 真严谨、真并行）
 
-如果需要：知识库 RAG（上传 5-10MB TXT 小说）、Code 节点确定性工具执行、可视化工作流编排，可使用 Dify 版。
+如果需要：知识库 RAG（上传 5-10MB TXT 小说）、Code 节点确定性工具执行、可视化工作流编排、**三角色并行架构**，可使用 Dify 版。
+
+### 三角色并行架构（v2 升级）
+
+将单一 LLM 节点拆为 3 个并行 LLM 节点 + 1 个合并 Code 节点 + 1 个叙事 LLM：
+
+```
+                          ┌→ [A] 世界推演 LLM (调用 T1-T5,T11)        ┐
+                          │                                            │
+意图路由 → 知识检索 ──┬──→┼→ [B] 原著校验 LLM (调用 T12-T17,用检索片段) ┼→ 合并 Code → 叙事 LLM → 状态更新 → 输出
+                    │    │                                            │
+                    └──→ └→ [C] 天道判定 LLM (调用 T6-T10)            ┘
+```
+
+**三大目标**：
+- **速度快**：A/B/C 三路并行，总延迟 = max(A,B,C) 而非三者之和
+- **长记忆**：game_log 保留 20 轮摘要 + 每份 Prompt 注入 recent_summary + NPC 档案持久化
+- **工具准确性**：LLM 只输出工具调用声明（决策），真执行由 Code 节点跑 tools.py 真函数
+
+### 4 份分层 Prompt
+
+| 文件 | 角色 | 工具组 | 输出 |
+|---|---|---|---|
+| `prompts/world_engine.md` | A·世界推演引擎 | T1 roll_d20 / T2 roll_dice / T3 calc_damage / T4 calc_survival_cost / T5 calc_travel / T11 update_state | 工具调用 JSON 数组 |
+| `prompts/heavenly_will.md` | C·天道守护者 | T6 calc_tiandao / T7 calc_breakthrough / T8 calc_relationship / T9 generate_threat / T10 calc_reward | 工具调用 JSON 数组 |
+| `prompts/canon_keeper.md` | B·原著守门人 | T12 update_character_state / T13 check_canon / T14 check_npc_persona / T15 calc_cultivation / T16 calc_shop / T17 check_character_state_change | 工具调用 JSON 数组 + 校验结论 |
+| `prompts/system_prompt.md` | 叙事合并节点 | 无（接收三路结果） | 完整 10 模块输出 |
+
+### Code 节点
+
+| 文件 | 用途 |
+|---|---|
+| `code-nodes/tools.py` | 17 个工具函数实现（T1-T17）+ 伪随机种子法 + 工具调度表 |
+| `code-nodes/merge_results.py` | **新增** 三路工具调用合并执行器：解析 3 个 LLM 输出的 JSON 数组 → 统一调用 tools.py → 返回汇总结果 |
+| `code-nodes/state_parser.py` | 解析叙事 LLM 输出的模块9 JSON → 更新 player_state/game_log/world_time |
+| `code-nodes/intent_classifier.py` | 意图分类路由（init_game/game_action/save/load/query/verbose/simple） |
+| `code-nodes/knowledge_base_manager.py` | 动态知识库 CRUD |
 
 ### 部署 Dify 版
 
@@ -161,18 +206,21 @@ cd mohun-jianghu
 bash scripts/deploy.sh
 ```
 
-详见 `dify/` 目录下的系统提示词、Code 节点代码和 Chatflow DSL。
+详见 `dify/` 目录下的 4 份 Prompt、5 个 Code 节点和 Chatflow DSL（17 节点 + 21 边 + 9 会话变量）。
 
 ### Dify 版 vs 纯前端版
 
-| 特性 | 纯前端版 | Dify 版 |
+| 特性 | 纯前端版 | Dify 版（v2 并行） |
 |---|---|---|
 | 部署难度 | 极低（上传1个文件） | 中（需部署 Dify） |
 | 大文件 RAG | 不支持 | 支持（5-10MB TXT） |
-| 确定性工具 | LLM 自算 | Code 节点真函数 |
+| 确定性工具 | LLM 自算（可能幻觉） | Code 节点真函数（确定性） |
 | 知识库 | 不支持 | 动态知识库 |
+| 工作流并行 | 不支持 | 3 LLM 并行 + 合并节点 |
+| NPC 原著校验 | LLM 兼任 | 独立 LLM 节点 + 检索增强 |
 | 手机体验 | 好 | 取决于 dify-chat |
-| 成本 | 仅 LLM API | LLM API + 服务器 |
+| 成本 | 仅 LLM API | LLM API ×3 节点 + 服务器 |
+| 延迟 | 单次 LLM 调用 | max(A,B,C) + 合并 + 叙事 |
 
 ---
 
