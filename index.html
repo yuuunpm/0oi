@@ -341,7 +341,7 @@ const NOVELS = [
   { id: "水浒传", icon: "🗡️", name: "水浒传", desc: "北宋末年·梁山好汉" },
   { id: "红楼梦", icon: "🌸", name: "红楼梦", desc: "清代·贾府兴衰" },
   { id: "天龙八部", icon: "🐉", name: "天龙八部", desc: "北宋·金庸武侠" },
-  { id: " custom", icon: "✍️", name: "自定义小说", desc: "手动输入小说名称" },
+  { id: "__custom__", icon: "✍️", name: "自定义小说", desc: "手动输入小说名称" },
 ];
 
 // LLM 配置预设
@@ -534,7 +534,7 @@ async function callLLM(userInput, onStream) {
     model: cfg.model,
     messages: messages,
     temperature: 0.85,
-    max_tokens: 4096,
+    max_tokens: 8192,
     stream: !!onStream,
   };
 
@@ -825,7 +825,13 @@ function renderWelcome() {
 
   const grid = el("div", { class: "novel-grid" });
   NOVELS.forEach(n => {
-    grid.appendChild(el("div", { class: "novel-card", onclick: () => selectNovel(n) }, [
+    grid.appendChild(el("div", { class: "novel-card", onclick: () => {
+      if (n.id === "__custom__") {
+        showCustomNovelModal();
+      } else {
+        selectNovel(n);
+      }
+    } }, [
       el("div", { class: "icon" }, [n.icon]),
       el("div", { class: "name" }, [n.name]),
       el("div", { class: "desc" }, [n.desc]),
@@ -943,6 +949,14 @@ function renderDifficulty() {
     el("div", {}, ["🎭 身份：" + idSummary]),
     el("div", {}, ["⚡ 难度：" + diffNames[state.selectedDifficulty]]),
   ]));
+
+  // 错误提示（开局失败时显示）
+  if (state.errorMsg) {
+    div.appendChild(el("div", { class: "error-banner", style: "margin-bottom:12px;" }, [
+      el("div", {}, ["❌ 开局失败：" + state.errorMsg]),
+      el("div", { style: "font-size:11px; color:var(--text-muted); margin-top:4px;" }, ["请检查 API 配置后重新点击进入江湖"]),
+    ]));
+  }
 
   div.appendChild(el("button", { class: "primary-btn", onclick: startGame, disabled: state.isLoading }, [state.isLoading ? "进入江湖..." : "进入江湖"]));
   div.appendChild(el("button", { class: "secondary-btn", onclick: () => { state.screen = "identity"; render(); } }, ["返回"]));
@@ -1391,6 +1405,20 @@ function showModal(title, content) {
   document.body.appendChild(overlay);
 }
 
+function showCustomNovelModal() {
+  const body = el("div", {}, [
+    el("p", { style: "font-size:13px; color:var(--text-secondary); margin-bottom:10px;" }, ["输入你想玩的小说名称（LLM 会基于该小说构建世界）："]),
+    el("input", { class: "input-field", id: "custom-novel-modal-input", placeholder: "例如：鹿鼎记、笑傲江湖、聊斋志异...", autofocus: true }),
+    el("button", { class: "primary-btn", style: "margin-top:10px;", onclick: () => {
+      const v = $("#custom-novel-modal-input")?.value.trim();
+      if (!v) { showToast("请输入小说名称"); return; }
+      document.querySelector(".modal-overlay")?.remove();
+      selectNovel({ id: v, name: v, icon: "📖", desc: "自定义" });
+    }}, ["确认并选择身份"]),
+  ]);
+  showModal("✍️ 自定义小说", body);
+}
+
 function showSaveModal() {
   if (!state.playerState) { showToast("暂无游戏数据"); return; }
   const saveData = {
@@ -1447,8 +1475,12 @@ function showModalLoad() {
         state.round = data.round || 0;
         state.playerState = data.playerState;
         state.history = data.history || [];
-        state.lastModules = null;
         state.openingText = "";
+        state.lastModules = null;
+        const lastA = [...state.history].reverse().find(m => m.role === "assistant");
+        if (lastA) {
+          try { state.lastModules = parseOutput(lastA.content); } catch (e) {}
+        }
         state.screen = "playing";
         saveGameState();
         document.querySelector(".modal-overlay")?.remove();
@@ -1473,6 +1505,8 @@ function nextScreen() {
 async function startGame() {
   state.isLoading = true;
   state.errorMsg = "";
+  state.streamingText = "";
+  state.screen = "playing";   // 立即切到游戏页，让 renderGame 能显示流式输出
   render();
 
   try {
@@ -1524,6 +1558,7 @@ async function startGame() {
     state.isLoading = false;
     state.streamingText = "";
     state.errorMsg = e.message;
+    state.screen = "difficulty";   // 回到难度页让用户能重试
     render();
   }
 }
@@ -1603,8 +1638,13 @@ function continueGame() {
   state.round = saved.round || 0;
   state.playerState = saved.playerState;
   state.history = saved.history || [];
-  state.lastModules = null;
   state.openingText = "";
+  // 从历史最后一条 assistant 回复恢复上轮模块，避免主区域空白
+  state.lastModules = null;
+  const lastAssistant = [...state.history].reverse().find(m => m.role === "assistant");
+  if (lastAssistant) {
+    try { state.lastModules = parseOutput(lastAssistant.content); } catch (e) { state.lastModules = null; }
+  }
   state.screen = "playing";
   render();
   showToast("已恢复游戏 · 第" + state.round + "轮");
