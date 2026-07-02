@@ -347,7 +347,7 @@ const NOVELS = [
 // LLM 配置预设
 const LLM_PRESETS = [
   { id: "doubao", name: "豆包 (火山引擎)", baseURL: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-pro-32k", keyHint: "在火山引擎控制台获取 API Key" },
-  { id: "glm", name: "智谱 GLM", baseURL: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-plus", keyHint: "在智谱开放平台获取 API Key" },
+  { id: "glm", name: "智谱 GLM", baseURL: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4.5-air", keyHint: "在智谱开放平台获取 API Key（推荐模型 glm-4.5-air / glm-4-plus / glm-4-flash）" },
   { id: "deepseek", name: "DeepSeek", baseURL: "https://api.deepseek.com/v1", model: "deepseek-chat", keyHint: "在 DeepSeek 平台获取 API Key" },
   { id: "openai", name: "OpenAI 兼容", baseURL: "https://api.openai.com/v1", model: "gpt-4o", keyHint: "OpenAI 或任何兼容 API" },
   { id: "custom", name: "自定义", baseURL: "", model: "", keyHint: "填写任意 OpenAI 兼容端点" },
@@ -523,6 +523,9 @@ async function callLLM(userInput, onStream) {
   if (!cfg.apiKey || !cfg.baseURL) {
     throw new Error("未配置 LLM API，请先点击右上角设置按钮配置");
   }
+  if (!cfg.model) {
+    throw new Error("未填写模型名称（如 glm-4.5-air / deepseek-chat）");
+  }
 
   const messages = buildMessages(userInput);
   const url = cfg.baseURL.replace(/\/$/, "") + "/chat/completions";
@@ -535,18 +538,37 @@ async function callLLM(userInput, onStream) {
     stream: !!onStream,
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + cfg.apiKey,
-    },
-    body: JSON.stringify(body),
-  });
+  // 90 秒超时（首轮 10 模块生成可能较慢），避免永远转圈
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + cfg.apiKey,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e.name === "AbortError") {
+      throw new Error("请求超时（90秒未响应）。可能是网络慢或模型名错误。请检查模型名（如 glm-4.5-air）和网络后重试。");
+    }
+    throw new Error("网络请求失败：" + e.message + "（可能是 CORS 跨域被拦截，或 Base URL 错误）");
+  }
+  clearTimeout(timeoutId);
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new Error(`API 请求失败 (${res.status}): ${errText.substring(0, 200)}`);
+    let hint = "";
+    if (res.status === 401) hint = "（API Key 无效或过期）";
+    else if (res.status === 404) hint = "（Base URL 或模型名错误，请检查模型名如 glm-4.5-air）";
+    else if (res.status === 429) hint = "（请求过于频繁或额度不足）";
+    throw new Error(`API 请求失败 (${res.status})${hint}: ${errText.substring(0, 200)}`);
   }
 
   if (!onStream) {
@@ -610,8 +632,8 @@ function parseOutput(text) {
   }
 
   // 提取纯文本段落（按模块标题分隔）
-  // 模块标题模式：模块N【...】 或 ━━━ 模块N【...】
-  const titleRe = /(?:━+|─+|={3,})?\s*模块(\d+)【([^】]+)】/g;
+  // 模块标题模式：模块N【...】 或 ━━━ 模块N【...】 或 # 模块 N【...】
+  const titleRe = /(?:━+|─+|={3,}|#+)?\s*模块\s*(\d+)\s*【([^】]+)】/g;
   const sections = [];
   let tm;
   while ((tm = titleRe.exec(text)) !== null) {
@@ -952,7 +974,13 @@ function renderGame() {
   }
 
   if (state.isLoading && !state.streamingText) {
-    main.appendChild(el("div", { class: "loading" }, [el("div", { class: "spinner" }, []), " 天道推演中..."]));
+    main.appendChild(el("div", { class: "loading" }, [
+      el("div", { class: "spinner" }, []),
+      el("div", {}, [
+        el("div", {}, ["天道推演中..."]),
+        el("div", { style: "font-size:11px; color:var(--text-muted); margin-top:4px;" }, ["首轮世界初始化可能需要 30-90 秒，请耐心等待"]),
+      ]),
+    ]));
   }
 
   return main;
@@ -967,12 +995,23 @@ function renderOpening() {
 
 function renderStreamingOutput() {
   const div = el("div", { class: "module-plot" }, [
-    el("div", { class: "module-label" }, ["正在生成..."]),
+    el("div", { class: "module-label" }, ["正在生成...（" + state.streamingText.length + " 字）"]),
     el("div", { id: "streaming-content", style: "white-space: pre-wrap; font-size: 13px; line-height: 1.8;" }, [
       state.streamingText + "▋"
     ]),
   ]);
   return div;
+}
+
+// 流式渲染节流：用 rAF 合并多次 token 回调，避免每个 token 都全量 render
+let _streamRenderScheduled = false;
+function scheduleStreamRender() {
+  if (_streamRenderScheduled) return;
+  _streamRenderScheduled = true;
+  requestAnimationFrame(() => {
+    _streamRenderScheduled = false;
+    if (state.isLoading && state.streamingText) render();
+  });
 }
 
 function renderModules(modules) {
@@ -1295,7 +1334,7 @@ function renderSetup() {
 
   div.appendChild(el("div", { class: "setting-item" }, [
     el("label", {}, ["模型名称"]),
-    el("input", { class: "input-field", value: cfg.model || "", placeholder: "deepseek-chat / glm-4-plus / doubao-pro-32k", oninput: (e) => { cfg.model = e.target.value; saveConfig(cfg); } }),
+    el("input", { class: "input-field", value: cfg.model || "", placeholder: "glm-4.5-air / deepseek-chat / doubao-pro-32k", oninput: (e) => { cfg.model = e.target.value; saveConfig(cfg); } }),
   ]));
 
   div.appendChild(el("div", { class: "setting-item" }, [
@@ -1463,8 +1502,7 @@ async function startGame() {
 
     const reply = await callLLM(initPrompt, (partial) => {
       state.streamingText = partial;
-      const streamEl = $("#streaming-content");
-      if (streamEl) streamEl.textContent = partial + "▋";
+      scheduleStreamRender();
     });
 
     state.isLoading = false;
@@ -1529,8 +1567,7 @@ async function sendAction(userInput) {
   try {
     const reply = await callLLM(userInput, (partial) => {
       state.streamingText = partial;
-      const streamEl = $("#streaming-content");
-      if (streamEl) streamEl.textContent = partial + "▋";
+      scheduleStreamRender();
     });
 
     state.isLoading = false;
