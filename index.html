@@ -331,7 +331,6 @@ const state = {
   displayMode: "simple",    // simple / verbose
   streamingText: "",        // 流式输出累积
   errorMsg: "",
-  loadStartTime: 0,         // 加载开始时间（用于仪式感提示）
 };
 
 // 预设小说
@@ -509,45 +508,14 @@ function buildSystemPrompt() {
 }
 
 function buildMessages(userInput) {
-  // 策略 C：Prompt 结构优化
-  // 1. system 放最前（不变规则部分，利于 prompt caching 命中）
-  // 2. 历史压缩：最近 6 轮完整保留，更早的压缩成摘要
-  // 3. 当前轮次状态和用户输入放最后（变化部分）
   const msgs = [{ role: "system", content: buildSystemPrompt() }];
-
-  const recent = state.history.slice(-6);
-  // 如果有更早的历史，压缩成摘要放在 recent 之前
-  const older = state.history.slice(0, -6);
-  if (older.length > 0) {
-    const summary = compressHistory(older);
-    msgs.push({ role: "system", content: "【前期剧情摘要】\n" + summary });
-  }
+  // 加入最近的历史（最多10轮）
+  const recent = state.history.slice(-10);
   for (const m of recent) {
     msgs.push({ role: m.role, content: m.content });
   }
   msgs.push({ role: "user", content: userInput });
   return msgs;
-}
-
-// 压缩历史：把更早的对话压成事件摘要，减少 token 消耗
-function compressHistory(history) {
-  const events = [];
-  for (let i = 0; i < history.length; i++) {
-    const m = history[i];
-    if (m.role === "user") {
-      // 提取用户行动（截断过长内容）
-      const action = m.content.substring(0, 80).replace(/\n/g, " ");
-      events.push("· 玩家：" + action);
-    } else if (m.role === "assistant") {
-      // 提取模块6世界推演的前两句作为结果摘要
-      const m6Match = m.content.match(/模块\s*6\s*【[^】]+】([\s\S]*?)(?=模块\s*7|模块\s*8|$)/);
-      if (m6Match) {
-        const summary = m6Match[1].replace(/```json[\s\S]*?```/g, "").trim().substring(0, 100).replace(/\n/g, " ");
-        events.push("  结果：" + summary);
-      }
-    }
-  }
-  return events.slice(-20).join("\n");  // 最多保留最近20条事件
 }
 
 async function callLLM(userInput, onStream) {
@@ -1020,23 +988,10 @@ function renderGame() {
   }
 
   if (state.isLoading && !state.streamingText) {
-    // 策略 C：加载仪式感 —— 根据等待时间轮换氛围提示
-    const elapsed = state.loadStartTime ? (Date.now() - state.loadStartTime) / 1000 : 0;
-    let phase;
-    if (state.round === 0) {
-      if (elapsed < 5) phase = "天道推演因果...";
-      else if (elapsed < 15) phase = "穿越者降临，世界正在响应...";
-      else if (elapsed < 30) phase = "原著时间线档案建立中...";
-      else phase = "开局身份与命运编织中...";
-    } else {
-      if (elapsed < 5) phase = "天道推演中...";
-      else if (elapsed < 15) phase = "原著一致性校验中...";
-      else phase = "世界响应你的行动...";
-    }
     main.appendChild(el("div", { class: "loading" }, [
       el("div", { class: "spinner" }, []),
       el("div", {}, [
-        el("div", {}, [phase]),
+        el("div", {}, ["天道推演中..."]),
         el("div", { style: "font-size:11px; color:var(--text-muted); margin-top:4px;" }, ["首轮世界初始化可能需要 30-90 秒，请耐心等待"]),
       ]),
     ]));
@@ -1053,119 +1008,13 @@ function renderOpening() {
 }
 
 function renderStreamingOutput() {
-  // 策略 B：流式分模块渲染。实时解析已完成的模块，渲染到对应面板；
-  // 正在生成的模块高亮显示；JSON 代码块在流式时折叠隐藏，避免刷屏。
-  const text = state.streamingText;
-  const partial = parsePartialModules(text);
-  const div = el("div", {}, [
-    el("div", { class: "module-plot", style: "margin-bottom:10px;" }, [
-      el("div", { class: "module-label" }, [
-        "正在推演...（" + text.length + " 字" +
-        (partial.finished.length > 0 ? " · 已生成 " + partial.finished.length + " 个模块" : "") +
-        "）"
-      ]),
+  const div = el("div", { class: "module-plot" }, [
+    el("div", { class: "module-label" }, ["正在生成...（" + state.streamingText.length + " 字）"]),
+    el("div", { id: "streaming-content", style: "white-space: pre-wrap; font-size: 13px; line-height: 1.8;" }, [
+      state.streamingText + "▋"
     ]),
   ]);
-
-  // 已完成的模块：渲染到对应面板（JSON 折叠）
-  partial.finished.forEach(m => {
-    div.appendChild(renderStreamingModule(m));
-  });
-
-  // 正在生成的模块（最后一个未完成的片段）
-  if (partial.current) {
-    div.appendChild(renderStreamingCurrent(partial.current));
-  }
-
   return div;
-}
-
-// 解析流式文本：按 "模块N【...】" 标题切分，已完成模块与当前生成中模块分开
-function parsePartialModules(text) {
-  const titleRe = /(?:━+|─+|={3,}|#+)?\s*模块\s*(\d+)\s*【([^】]+)】/g;
-  const sections = [];
-  let tm;
-  while ((tm = titleRe.exec(text)) !== null) {
-    sections.push({
-      num: parseInt(tm[1]),
-      name: tm[2],
-      start: tm.index,
-      headerEnd: tm.index + tm[0].length,
-    });
-  }
-
-  const finished = [];
-  let current = null;
-
-  if (sections.length === 0) {
-    // 还没出现任何模块标题，全部作为"当前生成中"
-    current = { text: text, num: 0, name: "" };
-  } else {
-    for (let i = 0; i < sections.length; i++) {
-      const sec = sections[i];
-      const nextStart = i + 1 < sections.length ? sections[i + 1].start : text.length;
-      const sectionText = text.substring(sec.headerEnd, nextStart).trim();
-      const isLast = i === sections.length - 1;
-      // 最后一个段落如果还在生成（没有下一个标题），作为 current
-      if (isLast) {
-        current = { num: sec.num, name: sec.name, text: sectionText, full: text.substring(sec.start, nextStart) };
-      } else {
-        finished.push({ num: sec.num, name: sec.name, text: sectionText });
-      }
-    }
-  }
-
-  return { finished, current };
-}
-
-// 渲染流式过程中已完成的单个模块
-function renderStreamingModule(m) {
-  const key = moduleKey(m.num);
-  if (!key) {
-    return el("div", { class: "module", style: "opacity:0.6;" }, [
-      el("div", { class: "module-header" }, [el("div", { class: "module-title" }, ["📦 模块" + m.num + "【" + m.name + "】"])]),
-      el("div", { class: "module-body", style: "font-size:12px; color:var(--text-muted);" }, ["（已生成）"]),
-    ]);
-  }
-  const mod = { type: "text", title: m.name, icon: moduleIcon(m.num), content: m.text };
-  // 提取 JSON 代码块（如果有）
-  const jsonMatch = m.text.match(/```json\s*([\s\S]*?)```/);
-  if (jsonMatch) {
-    mod.type = "json";
-    mod.raw = jsonMatch[1].trim();
-    mod.content = m.text.replace(/```json[\s\S]*?```/g, "").trim();
-  }
-  return renderSingleModule(mod, true);
-}
-
-// 渲染流式过程中"正在生成"的模块
-function renderStreamingCurrent(current) {
-  if (current.num === 0) {
-    // 还在生成开场/世界初始化，纯文本展示
-    return el("div", { class: "module-plot" }, [
-      el("div", { id: "streaming-content", style: "white-space: pre-wrap; font-size: 13px; line-height: 1.8;" }, [
-        current.text + "▋"
-      ]),
-    ]);
-  }
-  // 正在生成某个模块
-  const cleanText = current.text.replace(/```json[\s\S]*?```/g, "").trim();
-  const hasJson = /```json/.test(current.text);
-  return el("div", { class: "module", style: "border-color: var(--accent-gold); box-shadow: 0 0 12px rgba(212,168,83,0.2);" }, [
-    el("div", { class: "module-header" }, [
-      el("div", { class: "module-title" }, [moduleIcon(current.num) + " 模块" + current.num + "【" + current.name + "】"]),
-      el("div", { class: "module-arrow", style: "color:var(--accent-gold);" }, ["生成中▋"]),
-    ]),
-    el("div", { class: "module-body" }, [
-      cleanText ? el("div", { style: "white-space: pre-wrap; font-size:13px; line-height:1.8;" }, [cleanText]) : null,
-      hasJson ? el("div", { style: "font-size:11px; color:var(--text-muted); margin-top:8px;" }, ["🔧 JSON 数据生成中..."]) : null,
-    ]),
-  ]);
-}
-
-function moduleIcon(num) {
-  const icons = { 1:"📜", 2:"📋", 3:"⚡", 4:"🔍", 5:"🔧", 6:"🌍", 7:"⏳", 8:"⚔️", 9:"📊", 10:"🎯" };
-  return icons[num] || "📦";
 }
 
 // 流式渲染节流：用 rAF 合并多次 token 回调，避免每个 token 都全量 render
@@ -1177,18 +1026,6 @@ function scheduleStreamRender() {
     _streamRenderScheduled = false;
     if (state.isLoading && state.streamingText) render();
   });
-}
-
-// 仪式感提示轮换：流式开始前每隔 4 秒刷新一次加载提示
-let _loadingTimer = null;
-function startLoadingAnimation() {
-  stopLoadingAnimation();
-  _loadingTimer = setInterval(() => {
-    if (state.isLoading && !state.streamingText) render();
-  }, 4000);
-}
-function stopLoadingAnimation() {
-  if (_loadingTimer) { clearInterval(_loadingTimer); _loadingTimer = null; }
 }
 
 function renderModules(modules) {
@@ -1255,31 +1092,6 @@ function renderCollapsibleModule(mod, extraClass) {
     el("div", { class: "module-body" }, [el("div", { style: "white-space: pre-wrap; font-size: 13px; line-height: 1.9;" }, [mod.content])]),
   ]);
   return div;
-}
-
-// 流式渲染用：单模块简化渲染（JSON 折叠，纯文本直接显示）
-function renderSingleModule(mod, collapsed = false) {
-  if (mod.type === "json") {
-    const div = el("div", { class: "module" + (collapsed ? " collapsed" : "") }, [
-      el("div", { class: "module-header", onclick: () => div.classList.toggle("collapsed") }, [
-        el("div", { class: "module-title" }, [el("span", { class: "icon" }, [mod.icon]), mod.title]),
-        el("span", { class: "module-arrow" }, ["▼"]),
-      ]),
-      el("div", { class: "module-body" }, [
-        mod.content ? el("div", { style: "white-space: pre-wrap; font-size:13px; line-height:1.8; margin-bottom:8px;" }, [mod.content]) : null,
-        el("div", { class: "json-panel" }, [mod.raw || "（JSON 生成中）"]),
-      ]),
-    ]);
-    return div;
-  }
-  // 纯文本模块
-  if (mod.title === "玩家剧情推演" || mod.num === 1) {
-    return el("div", { class: "module-plot" }, [
-      el("div", { class: "module-label" }, [mod.icon + " " + mod.title]),
-      el("div", { style: "white-space: pre-wrap; font-size:13px; line-height:1.8;" }, [mod.content || ""]),
-    ]);
-  }
-  return renderCollapsibleModule(mod, "");
 }
 
 function renderActionsModule(mod) {
@@ -1694,9 +1506,7 @@ async function startGame() {
   state.isLoading = true;
   state.errorMsg = "";
   state.streamingText = "";
-  state.loadStartTime = Date.now();
   state.screen = "playing";   // 立即切到游戏页，让 renderGame 能显示流式输出
-  startLoadingAnimation();
   render();
 
   try {
@@ -1726,13 +1536,11 @@ async function startGame() {
 
     const reply = await callLLM(initPrompt, (partial) => {
       state.streamingText = partial;
-      stopLoadingAnimation();   // 流式开始后停止仪式感轮换
       scheduleStreamRender();
     });
 
     state.isLoading = false;
     state.streamingText = "";
-    stopLoadingAnimation();
 
     // 解析输出
     const modules = parseOutput(reply);
@@ -1751,7 +1559,6 @@ async function startGame() {
     state.streamingText = "";
     state.errorMsg = e.message;
     state.screen = "difficulty";   // 回到难度页让用户能重试
-    stopLoadingAnimation();
     render();
   }
 }
@@ -1789,21 +1596,17 @@ async function sendAction(userInput) {
   state.isLoading = true;
   state.errorMsg = "";
   state.streamingText = "";
-  state.loadStartTime = Date.now();
-  startLoadingAnimation();
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   try {
     const reply = await callLLM(userInput, (partial) => {
       state.streamingText = partial;
-      stopLoadingAnimation();
       scheduleStreamRender();
     });
 
     state.isLoading = false;
     state.streamingText = "";
-    stopLoadingAnimation();
 
     const modules = parseOutput(reply);
     state.lastModules = modules;
@@ -1824,7 +1627,6 @@ async function sendAction(userInput) {
     state.isLoading = false;
     state.streamingText = "";
     state.errorMsg = e.message;
-    stopLoadingAnimation();
     render();
   }
 }
