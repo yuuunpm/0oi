@@ -1,0 +1,87 @@
+# 墨魂·江湖 — Dify + dify-chat 一体化部署
+# 使用：docker compose up -d
+# 前提：已部署 Dify（默认 http://host.docker.internal:80）
+
+services:
+  # ============================================================
+  # dify-chat: 增强型 Dify 客户端
+  # 支持 <details> 折叠面板、Mermaid 图、ECharts、ThinkBlock
+  # ============================================================
+  dify-chat:
+    image: lexmin/dify-chat:latest
+    container_name: mohun-dify-chat
+    restart: unless-stopped
+    ports:
+      - "3200:3000"
+    environment:
+      # Dify API 地址（host.docker.internal 指向宿主机，若 Dify 也在 docker 中可改为 dify 容器名）
+      - DIFY_API_BASE_URL=http://host.docker.internal:80/v1
+      # 管理员密码（首次启动设置）
+      - ADMIN_PASSWORD=mohun_admin_2026
+      # 数据库（SQLite，数据持久化到 volume）
+      - DATABASE_URL=file:./data/mohun-dify-chat.db
+      # NextAuth 密钥（随机字符串，请修改）
+      - NEXTAUTH_SECRET=mohun-jianghu-secret-key-change-me-2026
+      - NEXTAUTH_URL=http://localhost:3200
+      # 时区
+      - TZ=Asia/Shanghai
+    volumes:
+      - dify-chat-data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - mohun-net
+
+  # ============================================================
+  # Ollama: 本地 Embedding 模型（bge-m3，中文最优）
+  # 仅用于知识库向量化，不占用 GPU 跑生成模型
+  # ============================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mohun-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    # 如有 GPU，取消以下注释启用 CUDA
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    networks:
+      - mohun-net
+
+  # ============================================================
+  # 初始化容器：自动拉取 bge-m3 embedding 模型
+  # ============================================================
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: mohun-ollama-init
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "等待 Ollama 启动..."
+        sleep 10
+        echo "拉取 bge-m3 embedding 模型（中文最优）..."
+        curl -s http://ollama:11434/api/pull -d '{"name":"bge-m3"}'
+        echo "bge-m3 拉取完成。"
+        echo "如需本地生成模型，可执行：docker exec mohun-ollama ollama pull qwen2.5:14b"
+    restart: "no"
+    networks:
+      - mohun-net
+
+volumes:
+  dify-chat-data:
+  ollama-data:
+
+networks:
+  mohun-net:
+    driver: bridge

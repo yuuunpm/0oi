@@ -1,0 +1,229 @@
+{
+  "app": {
+    "name": "墨魂·江湖 AI 文字 MUD 世界模拟器",
+    "description": "基于 Dify 的复杂中文文字角色扮演游戏引擎，支持动态切换小说原著世界",
+    "mode": "chatflow",
+    "icon": "🎭",
+    "icon_background": "#1a1a2e"
+  },
+  "conversation_variables": [
+    {
+      "name": "novel_name",
+      "value_type": "string",
+      "default": "",
+      "description": "本局游戏小说名"
+    },
+    {
+      "name": "game_phase",
+      "value_type": "string",
+      "default": "not_started",
+      "description": "游戏阶段：not_started / initializing / choosing_identity / playing / ended"
+    },
+    {
+      "name": "player_state",
+      "value_type": "string",
+      "default": "{}",
+      "description": "完整玩家状态 JSON（属性/战斗/生存/武功/物品/关系/天道/威胁/任务）"
+    },
+    {
+      "name": "world_time",
+      "value_type": "string",
+      "default": "{\"年\":\"\",\"月\":\"\",\"日\":1,\"时辰\":\"辰时\"}",
+      "description": "当前世界时间"
+    },
+    {
+      "name": "round_count",
+      "value_type": "number",
+      "default": 0,
+      "description": "当前游戏轮次（用于伪随机种子）"
+    },
+    {
+      "name": "game_log",
+      "value_type": "string",
+      "default": "[]",
+      "description": "最近20轮游戏摘要（解决长对话遗忘）"
+    },
+    {
+      "name": "dataset_id",
+      "value_type": "string",
+      "default": "",
+      "description": "本局小说知识库 ID"
+    },
+    {
+      "name": "display_mode",
+      "value_type": "string",
+      "default": "simple",
+      "description": "显示模式：simple(简略) / verbose(详细)"
+    }
+  ],
+  "workflow": {
+    "nodes": [
+      {
+        "id": "start",
+        "type": "start",
+        "position": {"x": 100, "y": 300},
+        "variables": [
+          {"name": "user_input", "value_type": "string", "required": true}
+        ]
+      },
+      {
+        "id": "intent_classifier",
+        "type": "code",
+        "position": {"x": 350, "y": 300},
+        "title": "意图分类器",
+        "code_file": "../code-nodes/intent_classifier.py",
+        "inputs": {
+          "user_input": "{{#start.user_input#}}",
+          "game_phase": "{{#game_phase#}}",
+          "novel_name": "{{#novel_name#}}"
+        },
+        "outputs": ["intent", "novel_name_extracted", "response"]
+      },
+      {
+        "id": "intent_router",
+        "type": "condition",
+        "position": {"x": 600, "y": 300},
+        "title": "意图路由",
+        "cases": [
+          {"id": "case_init", "conditions": [{"variable": "{{#intent_classifier.intent#}}", "operator": "is", "value": "init_game"}]},
+          {"id": "case_switch", "conditions": [{"variable": "{{#intent_classifier.intent#}}", "operator": "is", "value": "switch_novel"}]},
+          {"id": "case_save", "conditions": [{"variable": "{{#intent_classifier.intent#}}", "operator": "is", "value": "save"}]},
+          {"id": "case_load", "conditions": [{"variable": "{{#intent_classifier.intent#}}", "operator": "is", "value": "load"}]},
+          {"id": "case_query", "conditions": [{"variable": "{{#intent_classifier.intent#}}", "operator": "is", "value": "query"}]},
+          {"id": "case_verbose", "conditions": [{"variable": "{{#intent_classifier.intent#}}", "operator": "is", "value": "verbose"}]},
+          {"id": "case_simple", "conditions": [{"variable": "{{#intent_classifier.intent#}}", "operator": "is", "value": "simple"}]},
+          {"id": "case_action", "conditions": [{"variable": "{{#intent_classifier.intent#}}", "operator": "is", "value": "game_action"}]}
+        ]
+      },
+      {
+        "id": "kb_retrieval",
+        "type": "knowledge-retrieval",
+        "position": {"x": 900, "y": 650},
+        "title": "知识库检索（小说原文）",
+        "dataset_id": "{{#dataset_id#}}",
+        "query": "{{#start.user_input#}}",
+        "top_k": 6,
+        "retrieval_mode": "hybrid"
+      },
+      {
+        "id": "llm_game_engine",
+        "type": "llm",
+        "position": {"x": 1200, "y": 650},
+        "title": "游戏引擎 LLM",
+        "model": {
+          "provider": "deepseek",
+          "name": "deepseek-chat",
+          "temperature": 0.85,
+          "max_tokens": 4096
+        },
+        "system_prompt_file": "../prompts/system_prompt.md",
+        "system_prompt_vars": {
+          "novel_name": "{{#novel_name#}}",
+          "game_phase": "{{#game_phase#}}",
+          "round_count": "{{#round_count#}}",
+          "world_time": "{{#world_time#}}",
+          "player_state": "{{#player_state#}}",
+          "game_log": "{{#game_log#}}"
+        },
+        "context": "{{#kb_retrieval.result#}}",
+        "user_prompt": "{{#start.user_input#}}"
+      },
+      {
+        "id": "state_updater",
+        "type": "code",
+        "position": {"x": 1500, "y": 650},
+        "title": "状态更新",
+        "code_file": "../code-nodes/state_parser.py",
+        "inputs": {
+          "llm_output": "{{#llm_game_engine.text#}}",
+          "player_state": "{{#player_state#}}",
+          "world_time": "{{#world_time#}}",
+          "game_log": "{{#game_log#}}",
+          "round_count": "{{#round_count#}}"
+        },
+        "outputs": ["new_player_state", "new_world_time", "new_game_log", "new_round_count", "parse_error"]
+      },
+      {
+        "id": "var_assigner",
+        "type": "variable-assigner",
+        "position": {"x": 1800, "y": 650},
+        "title": "写入会话变量",
+        "assignments": [
+          {"variable": "player_state", "value": "{{#state_updater.new_player_state#}}"},
+          {"variable": "world_time", "value": "{{#state_updater.new_world_time#}}"},
+          {"variable": "game_log", "value": "{{#state_updater.new_game_log#}}"},
+          {"variable": "round_count", "value": "{{#state_updater.new_round_count#}}"}
+        ]
+      },
+      {
+        "id": "answer",
+        "type": "answer",
+        "position": {"x": 2100, "y": 650},
+        "title": "输出",
+        "answer": "{{#llm_game_engine.text#}}"
+      },
+      {
+        "id": "llm_init_world",
+        "type": "llm",
+        "position": {"x": 900, "y": 100},
+        "title": "世界初始化 LLM",
+        "model": {
+          "provider": "deepseek",
+          "name": "deepseek-chat",
+          "temperature": 0.9,
+          "max_tokens": 4096
+        },
+        "system_prompt": "你是【墨魂·江湖】世界初始化引擎。基于小说《{{#intent_classifier.novel_name_extracted#}}》生成：1）世界观简述 2）时间线起点 3）主要势力格局 4）4个可选开局身份（最后一个为自定义）。每个身份标注：身份名称与背景、初始时间点、初始位置、优势与劣势、初始必做任务预览。",
+        "user_prompt": "请基于小说《{{#intent_classifier.novel_name_extracted#}}》开始世界初始化。"
+      },
+      {
+        "id": "var_init_assigner",
+        "type": "variable-assigner",
+        "position": {"x": 1200, "y": 100},
+        "title": "写入初始变量",
+        "assignments": [
+          {"variable": "novel_name", "value": "{{#intent_classifier.novel_name_extracted#}}"},
+          {"variable": "game_phase", "value": "choosing_identity"}
+        ]
+      },
+      {
+        "id": "init_answer",
+        "type": "answer",
+        "position": {"x": 1500, "y": 100},
+        "title": "输出开局",
+        "answer": "{{#llm_init_world.text#}}"
+      },
+      {
+        "id": "save_answer",
+        "type": "answer",
+        "position": {"x": 900, "y": 200},
+        "title": "存档输出",
+        "answer": "【存档】\n小说：《{{#novel_name#}}》\n轮次：{{#round_count#}}\n\n请保存以下 JSON：\n```json\n{\"novel_name\":\"{{#novel_name#}}\",\"player_state\":{{#player_state#}},\"world_time\":{{#world_time#}},\"round_count\":{{#round_count#}},\"game_log\":{{#game_log#}}}\n```"
+      },
+      {
+        "id": "query_answer",
+        "type": "answer",
+        "position": {"x": 900, "y": 400},
+        "title": "查询指令输出",
+        "answer": "【查询结果】\n当前小说：《{{#novel_name#}}》\n游戏阶段：{{#game_phase#}}\n轮次：{{#round_count#}}\n\n完整状态：\n```json\n{{#player_state#}}\n```"
+      }
+    ],
+    "edges": [
+      {"source": "start", "target": "intent_classifier"},
+      {"source": "intent_classifier", "target": "intent_router"},
+      {"source": "intent_router", "target": "llm_init_world", "case_id": "case_init"},
+      {"source": "intent_router", "target": "llm_init_world", "case_id": "case_switch"},
+      {"source": "intent_router", "target": "save_answer", "case_id": "case_save"},
+      {"source": "intent_router", "target": "query_answer", "case_id": "case_query"},
+      {"source": "intent_router", "target": "query_answer", "case_id": "case_verbose"},
+      {"source": "intent_router", "target": "query_answer", "case_id": "case_simple"},
+      {"source": "intent_router", "target": "kb_retrieval", "case_id": "case_action"},
+      {"source": "llm_init_world", "target": "var_init_assigner"},
+      {"source": "var_init_assigner", "target": "init_answer"},
+      {"source": "kb_retrieval", "target": "llm_game_engine"},
+      {"source": "llm_game_engine", "target": "state_updater"},
+      {"source": "state_updater", "target": "var_assigner"},
+      {"source": "var_assigner", "target": "answer"}
+    ]
+  }
+}
